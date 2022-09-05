@@ -1,0 +1,5 @@
+name: Flat Response
+type: module
+description: 'reply to a comment without using threads'
+package: ideasOrange
+core_version_requirement: ^9 || ^10

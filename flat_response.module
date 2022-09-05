@@ -1,0 +1,118 @@
+<?php
+
+use Drupal\comment\CommentInterface;
+use Drupal\ajax_comments\Utility;
+use Drupal\Core\Url;
+use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+
+/**
+ * Implements hook_comment_links_alter().
+ *
+ * For entity bundles with ajax comments enabled, alter the comment link
+ * classes to allow ajax behaviors to be attached.
+ */
+function flat_response_comment_links_alter(
+  array &$links,
+  CommentInterface &$entity,
+  array &$context
+  ) {
+
+    // Comprobar que se trate de la contenido y el tipo de comentario adecuado.
+    $field_name       = $entity->getFieldName();
+    $thread           = $entity->getThread();
+    $cid = $entity->id();
+    $wrapper_html_id  = Utility::getWrapperIdFromEntity(
+      $context['commented_entity'],
+      $field_name
+    );
+    $permalink = $entity->permalink();
+    $param = $permalink->getRouteParameters();
+    if(isset($param['comment'])){
+      //Esto es el cid, no es el nro que nececito.
+      $reply_to = $entity->id();
+    }
+    //if (!isset($links['comment']['#links']['comment-flat-reply'])) {
+      $links['comment']['#links']['comment-flat-reply'] = [];
+      $links['comment']['#links']['comment-flat-reply']['title'] = t(
+        'Responder en mismo hilo'
+      );
+      $url_reply = Url::fromRoute(
+        'flat_response.reply',
+        [
+          'entity_type' => $entity->getCommentedEntityTypeId(),
+          'entity'      => $entity->getCommentedEntityId(),
+          'field_name'  => $entity->getFieldName(),
+          'pid'         => $entity->id(),
+          'p_cardinality' => $reply_to,
+        ]
+      );
+      $attributes = [
+        'data-wrapper-html-id'  => $wrapper_html_id,
+        'class'                 => [
+          'use-ajax',
+          'js-use-ajax-comments',
+          'js-ajax-comments-reply',
+          'js-ajax-comments-reply-' . $entity->getCommentedEntityId() . '-' . $entity->getFieldName() . '-' . $entity->id(),
+        ],
+      ];
+      $links['comment']['#links']['comment-flat-reply']['url'] = $url_reply;
+      $links['comment']['#links']['comment-flat-reply']['attributes'] = $attributes;
+    //}
+
+  }
+
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function flat_response_form_comment_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
+
+  $rute = \Drupal::routeMatch()->getRouteName();
+  $is_ajax = \Drupal::request()->isXmlHttpRequest();
+
+  if($rute === "flat_response.reply" && $is_ajax) {
+
+    $temp_store = Drupal::service('ajax_comments.temp_store');
+    $temp_store->processForm(\Drupal::request(), $form, $form_state);
+    /** @var \Drupal\comment\CommentInterface $comment */
+    $comment = $form_state->getFormObject()->getEntity();
+    $cid = $comment->id() ? $comment->id() : 0;
+
+    $wrapper_html_id = $temp_store->getSelectorValue(\Drupal::request(), 'wrapper_html_id');
+
+    $form['wrapper_html_id'] = [
+      '#type' => 'hidden',
+      '#value' => $wrapper_html_id,
+    ];
+    $form['wrapper_html_id']['#value'] = $wrapper_html_id;
+    $form['actions']['submit']['#ajax']['wrapper'] = $wrapper_html_id;
+    if (isset($form['actions']['cancel']['#ajax'])) {
+      $form['actions']['cancel']['#ajax']['wrapper'] = $wrapper_html_id;
+    } else if(!isset($form['actions']['cancel'])) {
+
+      $cancel = [
+        '#type' => 'submit',
+        '#value' => t('Cancel'),
+        '#access' => TRUE,
+        '#weight' => 99,
+        '#ajax' => [
+          'url' => Url::fromRoute(
+            'ajax_comments.cancel',
+            [
+              'cid' => $cid,
+            ]
+          ),
+          'wrapper' => $wrapper_html_id,
+          'method' => 'replace',
+          'effect' => 'fade',
+        ],
+      ];
+
+      $form['actions']['cancel'] = $cancel;
+    }
+  }
+}
+function flat_response_entity_view_alter(array &$build, ContentEntityInterface $entity, EntityViewDisplayInterface $display) {
+  $build;
+}

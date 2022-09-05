@@ -1,0 +1,14 @@
+flat_response.reply:
+  path: '/flat_response/reply/{entity_type}/{entity}/{field_name}/{pid}/{p_cardinality}'
+  defaults:
+    _controller: '\Drupal\flat_response\Controller\FlatResponseController::flatReply'
+    pid: ~
+    p_cardinality: ~
+  requirements:
+    _access: 'TRUE'
+    pid: ^[0-9]+
+    p_cardinality: ^[0-9]+
+  options:
+    parameters:
+      entity:
+        type: entity:{entity_type}
